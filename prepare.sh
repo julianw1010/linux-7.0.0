@@ -30,12 +30,6 @@ sudo apt-get update -y
 log "Installing ${#PACKAGES[@]} kernel build dependencies..."
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${PACKAGES[@]}"
 
-NUMA_NODES=$(ls -d /sys/devices/system/node/node[0-9]* 2>/dev/null | wc -l)
-if [[ "$NUMA_NODES" -lt 1 ]]; then
-    NUMA_NODES=1
-fi
-log "Detected $NUMA_NODES NUMA node(s)."
-
 RUNNING_CONFIG="/boot/config-$(uname -r)"
 log "Copying running kernel config from $RUNNING_CONFIG..."
 if [[ ! -f "$RUNNING_CONFIG" ]]; then
@@ -86,29 +80,7 @@ fi
 log "Resolving dependencies (olddefconfig, pass 1)..."
 make olddefconfig
 
-log "Detecting NUMA node-count config symbol..."
-# Different kernel variants call this option different things.
-# Only one of MITOSIS_NUMA_NODE_COUNT / HYDRA_NUMA_NODE_COUNT should exist
-# in a given tree, so we detect whichever is actually defined in the
-# Kconfig sources and set that one.
-NUMA_CONFIG_NAME=""
-for candidate in MITOSIS_NUMA_NODE_COUNT HYDRA_NUMA_NODE_COUNT; do
-    if grep -rqsE "^[[:space:]]*config[[:space:]]+${candidate}([[:space:]]|\$)" --include='Kconfig*' .; then
-        NUMA_CONFIG_NAME="$candidate"
-        break
-    fi
-done
-
-if [[ -z "$NUMA_CONFIG_NAME" ]]; then
-    echo "ERROR: neither MITOSIS_NUMA_NODE_COUNT nor HYDRA_NUMA_NODE_COUNT" >&2
-    echo "       was found in this tree's Kconfig sources. Aborting." >&2
-    exit 1
-fi
-log "  -> found CONFIG_${NUMA_CONFIG_NAME}"
-
 log "Applying custom NUMA / virtualization / mitigation settings..."
-log "  CONFIG_${NUMA_CONFIG_NAME} = $NUMA_NODES"
-./scripts/config --set-val "$NUMA_CONFIG_NAME" "$NUMA_NODES"
 ./scripts/config --enable  NUMA
 ./scripts/config --enable  PARAVIRT
 ./scripts/config --enable  PARAVIRT_XXL
