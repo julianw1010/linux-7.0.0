@@ -416,4 +416,7 @@ struct prctl_mm_map {
 # define PR_CFI_DISABLE		_BITUL(1)
 # define PR_CFI_LOCK		_BITUL(2)
 
+#define PR_SET_PGTABLE_CACHE_ONLY	102
+#define PR_GET_PGTABLE_CACHE_ONLY	103
+
 #endif /* _LINUX_PRCTL_H */

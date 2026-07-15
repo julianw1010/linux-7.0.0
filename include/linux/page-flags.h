@@ -127,6 +127,7 @@ enum pageflags {
 #ifdef CONFIG_ARCH_USES_PG_ARCH_3
 	PG_arch_3,
 #endif
+	PG_ptcache,
 	__NR_PAGEFLAGS,
 
 	PG_readahead = PG_reclaim,
@@ -585,6 +586,7 @@ FOLIO_FLAG(swapbacked, FOLIO_HEAD_PAGE)
  * - PG_private and PG_private_2 cause release_folio() and co to be invoked
  */
 PAGEFLAG(Private, private, PF_ANY)
+PAGEFLAG(PtCache, ptcache, PF_ANY)
 FOLIO_FLAG(private_2, FOLIO_HEAD_PAGE)
 
 /* owner_2 can be set on tail pages for anon memory */

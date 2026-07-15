@@ -4,6 +4,8 @@
 
 #ifdef CONFIG_MMU
 
+#include <linux/ptcache.h>
+
 #define GFP_PGTABLE_KERNEL	(GFP_KERNEL | __GFP_ZERO)
 #define GFP_PGTABLE_USER	(GFP_PGTABLE_KERNEL | __GFP_ACCOUNT)
 
@@ -72,10 +74,16 @@ static inline void pte_free_kernel(struct mm_struct *mm, pte_t *pte)
 static inline pgtable_t __pte_alloc_one_noprof(struct mm_struct *mm, gfp_t gfp)
 {
 	struct ptdesc *ptdesc;
+	struct page *page;
 
-	ptdesc = pagetable_alloc_noprof(gfp, 0);
-	if (!ptdesc)
-		return NULL;
+	page = ptcache_alloc(mm, gfp);
+	if (page) {
+		ptdesc = page_ptdesc(page);
+	} else {
+		ptdesc = pagetable_alloc_noprof(gfp, 0);
+		if (!ptdesc)
+			return NULL;
+	}
 	if (!pagetable_pte_ctor(mm, ptdesc)) {
 		pagetable_free(ptdesc);
 		return NULL;
@@ -115,6 +123,9 @@ static inline void pte_free(struct mm_struct *mm, struct page *pte_page)
 {
 	struct ptdesc *ptdesc = page_ptdesc(pte_page);
 
+	if (ptcache_return_table(ptdesc))
+		return;
+
 	pagetable_dtor_free(ptdesc);
 }
 
@@ -136,13 +147,19 @@ static inline void pte_free(struct mm_struct *mm, struct page *pte_page)
 static inline pmd_t *pmd_alloc_one_noprof(struct mm_struct *mm, unsigned long addr)
 {
 	struct ptdesc *ptdesc;
+	struct page *page;
 	gfp_t gfp = GFP_PGTABLE_USER;
 
 	if (mm == &init_mm)
 		gfp = GFP_PGTABLE_KERNEL;
-	ptdesc = pagetable_alloc_noprof(gfp, 0);
-	if (!ptdesc)
-		return NULL;
+	page = ptcache_alloc(mm, gfp);
+	if (page) {
+		ptdesc = page_ptdesc(page);
+	} else {
+		ptdesc = pagetable_alloc_noprof(gfp, 0);
+		if (!ptdesc)
+			return NULL;
+	}
 	if (!pagetable_pmd_ctor(mm, ptdesc)) {
 		pagetable_free(ptdesc);
 		return NULL;
@@ -162,6 +179,9 @@ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
 	struct ptdesc *ptdesc = virt_to_ptdesc(pmd);
 
 	BUG_ON((unsigned long)pmd & (PAGE_SIZE-1));
+	if (ptcache_return_table(ptdesc))
+		return;
+
 	pagetable_dtor_free(ptdesc);
 }
 #endif
@@ -174,13 +194,19 @@ static inline pud_t *__pud_alloc_one_noprof(struct mm_struct *mm, unsigned long 
 {
 	gfp_t gfp = GFP_PGTABLE_USER;
 	struct ptdesc *ptdesc;
+	struct page *page;
 
 	if (mm == &init_mm)
 		gfp = GFP_PGTABLE_KERNEL;
 
-	ptdesc = pagetable_alloc_noprof(gfp, 0);
-	if (!ptdesc)
-		return NULL;
+	page = ptcache_alloc(mm, gfp);
+	if (page) {
+		ptdesc = page_ptdesc(page);
+	} else {
+		ptdesc = pagetable_alloc_noprof(gfp, 0);
+		if (!ptdesc)
+			return NULL;
+	}
 
 	pagetable_pud_ctor(ptdesc);
 
@@ -213,6 +239,9 @@ static inline void __pud_free(struct mm_struct *mm, pud_t *pud)
 	struct ptdesc *ptdesc = virt_to_ptdesc(pud);
 
 	BUG_ON((unsigned long)pud & (PAGE_SIZE-1));
+	if (ptcache_return_table(ptdesc))
+		return;
+
 	pagetable_dtor_free(ptdesc);
 }
 
@@ -231,13 +260,19 @@ static inline p4d_t *__p4d_alloc_one_noprof(struct mm_struct *mm, unsigned long 
 {
 	gfp_t gfp = GFP_PGTABLE_USER;
 	struct ptdesc *ptdesc;
+	struct page *page;
 
 	if (mm == &init_mm)
 		gfp = GFP_PGTABLE_KERNEL;
 
-	ptdesc = pagetable_alloc_noprof(gfp, 0);
-	if (!ptdesc)
-		return NULL;
+	page = ptcache_alloc(mm, gfp);
+	if (page) {
+		ptdesc = page_ptdesc(page);
+	} else {
+		ptdesc = pagetable_alloc_noprof(gfp, 0);
+		if (!ptdesc)
+			return NULL;
+	}
 
 	pagetable_p4d_ctor(ptdesc);
 
@@ -261,6 +296,9 @@ static inline void __p4d_free(struct mm_struct *mm, p4d_t *p4d)
 	struct ptdesc *ptdesc = virt_to_ptdesc(p4d);
 
 	BUG_ON((unsigned long)p4d & (PAGE_SIZE-1));
+	if (ptcache_return_table(ptdesc))
+		return;
+
 	pagetable_dtor_free(ptdesc);
 }
 

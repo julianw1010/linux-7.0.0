@@ -14,6 +14,7 @@
 #include <linux/mmu_notifier.h>
 #include <linux/swap.h>
 #include <linux/hugetlb_inline.h>
+#include <linux/ptcache.h>
 #include <asm/tlbflush.h>
 #include <asm/cacheflush.h>
 
@@ -217,6 +218,9 @@ struct mmu_table_batch {
 static inline void __tlb_remove_table(void *table)
 {
 	struct ptdesc *ptdesc = (struct ptdesc *)table;
+
+	if (ptcache_return_table(ptdesc))
+		return;
 
 	pagetable_dtor_free(ptdesc);
 }

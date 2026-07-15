@@ -1455,8 +1455,12 @@ static struct linux_binprm *alloc_bprm(int fd, struct filename *filename, int fl
 	bprm->is_check = !!(flags & AT_EXECVE_CHECK);
 
 	retval = bprm_mm_init(bprm);
-	if (!retval)
+	if (!retval) {
+		if (current->mm)
+			bprm->mm->cache_only_mode = current->mm->cache_only_mode;
+
 		return bprm;
+	}
 
 out_free:
 	free_bprm(bprm);
