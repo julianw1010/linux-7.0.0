@@ -78,6 +78,8 @@ static struct page *ptcache_pop(int node)
 	return page;
 }
 
+int sysctl_ptcache_invlpgb __read_mostly = 1;
+
 struct page *ptcache_alloc(struct mm_struct *mm, gfp_t gfp)
 {
 	struct page *page;
@@ -210,6 +212,7 @@ static int ptcache_show(struct seq_file *m, void *v)
 	seq_puts(m, " write N > 0: add N pages to the cache of every online node\n");
 	seq_puts(m, " write -1:    drain all nodes\n");
 	seq_puts(m, " per-process opt-in: prctl(PR_SET_PGTABLE_CACHE_ONLY, 1, 0)\n");
+	seq_puts(m, " /proc/ptcache/invlpgb: 0 = deny global asid to opted-in mms\n");
 	seq_puts(m, " rows = cache metric,  cols = NUMA node\n");
 	seq_puts(m, " ----------------------------------------------------------------------\n");
 
@@ -297,11 +300,68 @@ static const struct proc_ops ptcache_proc_ops = {
 	.proc_release	= single_release,
 };
 
-static int __init ptcache_proc_init(void)
+static int ptcache_invlpgb_show(struct seq_file *m, void *v)
 {
-	if (!proc_create("ptcache", 0644, NULL, &ptcache_proc_ops))
-		return -ENOMEM;
+	seq_printf(m, "%d\n", READ_ONCE(sysctl_ptcache_invlpgb));
 
 	return 0;
+}
+
+static int ptcache_invlpgb_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ptcache_invlpgb_show, NULL);
+}
+
+static ssize_t ptcache_invlpgb_write(struct file *file, const char __user *ubuf,
+				     size_t count, loff_t *ppos)
+{
+	char buf[32];
+	size_t len;
+	long val;
+
+	len = min(count, sizeof(buf) - 1);
+	if (copy_from_user(buf, ubuf, len))
+		return -EFAULT;
+	buf[len] = '\0';
+
+	if (kstrtol(buf, 10, &val))
+		return -EINVAL;
+
+	if (val < 0 || val > 1)
+		return -EINVAL;
+
+	WRITE_ONCE(sysctl_ptcache_invlpgb, val);
+
+	return count;
+}
+
+static const struct proc_ops ptcache_invlpgb_proc_ops = {
+	.proc_open	= ptcache_invlpgb_open,
+	.proc_read	= seq_read,
+	.proc_write	= ptcache_invlpgb_write,
+	.proc_lseek	= seq_lseek,
+	.proc_release	= single_release,
+};
+
+static int __init ptcache_proc_init(void)
+{
+	struct proc_dir_entry *dir;
+
+	dir = proc_mkdir("ptcache", NULL);
+	if (!dir)
+		return -ENOMEM;
+
+	if (!proc_create("cache", 0644, dir, &ptcache_proc_ops))
+		goto fail;
+
+	if (!proc_create("invlpgb", 0644, dir, &ptcache_invlpgb_proc_ops))
+		goto fail;
+
+	return 0;
+
+fail:
+	remove_proc_subtree("ptcache", NULL);
+
+	return -ENOMEM;
 }
 late_initcall(ptcache_proc_init);

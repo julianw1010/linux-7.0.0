@@ -13,6 +13,7 @@
 #include <linux/mmu_notifier.h>
 #include <linux/mmu_context.h>
 #include <linux/kvm_types.h>
+#include <linux/ptcache.h>
 
 #include <asm/tlbflush.h>
 #include <asm/mmu_context.h>
@@ -446,6 +447,9 @@ static bool mm_needs_global_asid(struct mm_struct *mm, u16 asid)
 static void consider_global_asid(struct mm_struct *mm)
 {
 	if (!cpu_feature_enabled(X86_FEATURE_INVLPGB))
+		return;
+
+	if (READ_ONCE(mm->cache_only_mode) && !READ_ONCE(sysctl_ptcache_invlpgb))
 		return;
 
 	/* Check every once in a while. */

@@ -8,6 +8,8 @@ struct mm_struct;
 struct page;
 struct ptdesc;
 
+extern int sysctl_ptcache_invlpgb;
+
 struct page *ptcache_alloc(struct mm_struct *mm, gfp_t gfp);
 bool ptcache_return_table(struct ptdesc *ptdesc);
 
