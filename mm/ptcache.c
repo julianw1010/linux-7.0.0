@@ -212,7 +212,7 @@ static int ptcache_show(struct seq_file *m, void *v)
 	seq_puts(m, " write N > 0: add N pages to the cache of every online node\n");
 	seq_puts(m, " write -1:    drain all nodes\n");
 	seq_puts(m, " per-process opt-in: prctl(PR_SET_PGTABLE_CACHE_ONLY, 1, 0)\n");
-	seq_puts(m, " /proc/ptcache/invlpgb: 0 = deny global asid to opted-in mms\n");
+	seq_puts(m, " /proc/ptcache/invlpgb: 0 = deny global asid to all mms\n");
 	seq_puts(m, " rows = cache metric,  cols = NUMA node\n");
 	seq_puts(m, " ----------------------------------------------------------------------\n");
 

@@ -449,7 +449,7 @@ static void consider_global_asid(struct mm_struct *mm)
 	if (!cpu_feature_enabled(X86_FEATURE_INVLPGB))
 		return;
 
-	if (READ_ONCE(mm->cache_only_mode) && !READ_ONCE(sysctl_ptcache_invlpgb))
+	if (!READ_ONCE(sysctl_ptcache_invlpgb))
 		return;
 
 	/* Check every once in a while. */
