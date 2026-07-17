@@ -30,6 +30,12 @@ sudo apt-get update -y
 log "Installing ${#PACKAGES[@]} kernel build dependencies..."
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${PACKAGES[@]}"
 
+NUMA_NODES=$(ls -d /sys/devices/system/node/node[0-9]* 2>/dev/null | wc -l)
+if [[ "$NUMA_NODES" -lt 1 ]]; then
+    NUMA_NODES=1
+fi
+log "Detected $NUMA_NODES NUMA node(s)."
+
 RUNNING_CONFIG="/boot/config-$(uname -r)"
 log "Copying running kernel config from $RUNNING_CONFIG..."
 if [[ ! -f "$RUNNING_CONFIG" ]]; then
@@ -81,6 +87,8 @@ log "Resolving dependencies (olddefconfig, pass 1)..."
 make olddefconfig
 
 log "Applying custom NUMA / virtualization / mitigation settings..."
+log "  CONFIG_PTCACHE_NUMA_NODE_COUNT = $NUMA_NODES"
+./scripts/config --set-val CONFIG_PTCACHE_NUMA_NODE_COUNT "$NUMA_NODES"
 ./scripts/config --enable  NUMA
 ./scripts/config --enable  PARAVIRT
 ./scripts/config --enable  PARAVIRT_XXL
