@@ -37,8 +37,8 @@ struct ptcache_stats {
 	atomic_long_t hits;
 	atomic_long_t misses;
 
-	atomic_long_t pt_cur[MAX_NUMNODES];
-	atomic_long_t pt_max[MAX_NUMNODES];
+	atomic_long_t pt_cur[MAX_NUMNODES][PTCACHE_PT_NR_LEVELS];
+	atomic_long_t pt_max[MAX_NUMNODES][PTCACHE_PT_NR_LEVELS];
 
 	atomic_long_t tlb_shootdowns;
 	atomic_long_t tlb_broadcasts;
@@ -124,30 +124,34 @@ static void ptcache_bump_max(atomic_long_t *maxp, long cur)
 	}
 }
 
-void ptcache_stats_pt_inc(struct mm_struct *mm, int node)
+void ptcache_stats_pt_inc(struct mm_struct *mm, int node, int level)
 {
 	struct ptcache_stats *s;
 	long cur;
 
 	if (!mm || node < 0 || node >= MAX_NUMNODES)
 		return;
+	if (level < 0 || level >= PTCACHE_PT_NR_LEVELS)
+		return;
 	s = mm->ptcache_stats;
 	if (!s)
 		return;
-	cur = atomic_long_inc_return(&s->pt_cur[node]);
-	ptcache_bump_max(&s->pt_max[node], cur);
+	cur = atomic_long_inc_return(&s->pt_cur[node][level]);
+	ptcache_bump_max(&s->pt_max[node][level], cur);
 }
 
-void ptcache_stats_pt_dec(struct mm_struct *mm, int node)
+void ptcache_stats_pt_dec(struct mm_struct *mm, int node, int level)
 {
 	struct ptcache_stats *s;
 
 	if (!mm || node < 0 || node >= MAX_NUMNODES)
 		return;
+	if (level < 0 || level >= PTCACHE_PT_NR_LEVELS)
+		return;
 	s = mm->ptcache_stats;
 	if (!s)
 		return;
-	atomic_long_dec(&s->pt_cur[node]);
+	atomic_long_dec(&s->pt_cur[node][level]);
 }
 
 void ptcache_stats_tlb_ipi(struct mm_struct *mm, long count)
@@ -564,17 +568,26 @@ static void ptcache_stats_print(struct seq_file *m, struct ptcache_stats *s,
 	ptcache_print_section(m, "TLB broadcasts (INVLPGB)");
 	ptcache_print_kv(m, "Total INVLPGB instructions", tlb_bcast);
 
-	ptcache_print_section(m, history ?
-		"Page tables per node: max watermark" :
-		"Page tables per node: current");
-	ptcache_print_node_header(m);
-	seq_puts(m, "    PT  ");
-	for_each_online_node(node)
-		seq_printf(m, " %7ld",
-			   atomic_long_read(history ?
-					    &s->pt_max[node] :
-					    &s->pt_cur[node]));
-	seq_putc(m, '\n');
+	{
+		static const char * const lvl_name[PTCACHE_PT_NR_LEVELS] = {
+			"PGD", "P4D", "PUD", "PMD", "PTE",
+		};
+		int lvl;
+
+		ptcache_print_section(m, history ?
+			"Page tables per node: max watermark  [rows = level, cols = node]" :
+			"Page tables per node: current  [rows = level, cols = node]");
+		ptcache_print_node_header(m);
+		for (lvl = 0; lvl < PTCACHE_PT_NR_LEVELS; lvl++) {
+			seq_printf(m, "    %-4s", lvl_name[lvl]);
+			for_each_online_node(node)
+				seq_printf(m, " %7ld",
+					   atomic_long_read(history ?
+							    &s->pt_max[node][lvl] :
+							    &s->pt_cur[node][lvl]));
+			seq_putc(m, '\n');
+		}
+	}
 
 	seq_putc(m, '\n');
 }

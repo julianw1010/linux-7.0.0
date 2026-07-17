@@ -89,7 +89,7 @@ static inline pgtable_t __pte_alloc_one_noprof(struct mm_struct *mm, gfp_t gfp)
 		return NULL;
 	}
 
-	ptcache_stats_pt_inc(mm, page_to_nid(ptdesc_page(ptdesc)));
+	ptcache_stats_pt_inc(mm, page_to_nid(ptdesc_page(ptdesc)), PTCACHE_PT_PTE);
 	return ptdesc_page(ptdesc);
 }
 #define __pte_alloc_one(...)	alloc_hooks(__pte_alloc_one_noprof(__VA_ARGS__))
@@ -124,7 +124,7 @@ static inline void pte_free(struct mm_struct *mm, struct page *pte_page)
 {
 	struct ptdesc *ptdesc = page_ptdesc(pte_page);
 
-	ptcache_stats_pt_dec(mm, page_to_nid(pte_page));
+	ptcache_stats_pt_dec(mm, page_to_nid(pte_page), PTCACHE_PT_PTE);
 	if (ptcache_return_table(ptdesc))
 		return;
 
@@ -170,7 +170,7 @@ static inline pmd_t *pmd_alloc_one_noprof(struct mm_struct *mm, unsigned long ad
 	if (mm == &init_mm)
 		ptdesc_set_kernel(ptdesc);
 
-	ptcache_stats_pt_inc(mm, page_to_nid(ptdesc_page(ptdesc)));
+	ptcache_stats_pt_inc(mm, page_to_nid(ptdesc_page(ptdesc)), PTCACHE_PT_PMD);
 	return ptdesc_address(ptdesc);
 }
 #define pmd_alloc_one(...)	alloc_hooks(pmd_alloc_one_noprof(__VA_ARGS__))
@@ -182,7 +182,7 @@ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
 	struct ptdesc *ptdesc = virt_to_ptdesc(pmd);
 
 	BUG_ON((unsigned long)pmd & (PAGE_SIZE-1));
-	ptcache_stats_pt_dec(mm, page_to_nid(virt_to_page(pmd)));
+	ptcache_stats_pt_dec(mm, page_to_nid(virt_to_page(pmd)), PTCACHE_PT_PMD);
 	if (ptcache_return_table(ptdesc))
 		return;
 
@@ -217,7 +217,7 @@ static inline pud_t *__pud_alloc_one_noprof(struct mm_struct *mm, unsigned long 
 	if (mm == &init_mm)
 		ptdesc_set_kernel(ptdesc);
 
-	ptcache_stats_pt_inc(mm, page_to_nid(ptdesc_page(ptdesc)));
+	ptcache_stats_pt_inc(mm, page_to_nid(ptdesc_page(ptdesc)), PTCACHE_PT_PUD);
 	return ptdesc_address(ptdesc);
 }
 #define __pud_alloc_one(...)	alloc_hooks(__pud_alloc_one_noprof(__VA_ARGS__))
@@ -244,7 +244,7 @@ static inline void __pud_free(struct mm_struct *mm, pud_t *pud)
 	struct ptdesc *ptdesc = virt_to_ptdesc(pud);
 
 	BUG_ON((unsigned long)pud & (PAGE_SIZE-1));
-	ptcache_stats_pt_dec(mm, page_to_nid(virt_to_page(pud)));
+	ptcache_stats_pt_dec(mm, page_to_nid(virt_to_page(pud)), PTCACHE_PT_PUD);
 	if (ptcache_return_table(ptdesc))
 		return;
 
@@ -285,7 +285,7 @@ static inline p4d_t *__p4d_alloc_one_noprof(struct mm_struct *mm, unsigned long 
 	if (mm == &init_mm)
 		ptdesc_set_kernel(ptdesc);
 
-	ptcache_stats_pt_inc(mm, page_to_nid(ptdesc_page(ptdesc)));
+	ptcache_stats_pt_inc(mm, page_to_nid(ptdesc_page(ptdesc)), PTCACHE_PT_P4D);
 	return ptdesc_address(ptdesc);
 }
 #define __p4d_alloc_one(...)	alloc_hooks(__p4d_alloc_one_noprof(__VA_ARGS__))
@@ -303,7 +303,7 @@ static inline void __p4d_free(struct mm_struct *mm, p4d_t *p4d)
 	struct ptdesc *ptdesc = virt_to_ptdesc(p4d);
 
 	BUG_ON((unsigned long)p4d & (PAGE_SIZE-1));
-	ptcache_stats_pt_dec(mm, page_to_nid(virt_to_page(p4d)));
+	ptcache_stats_pt_dec(mm, page_to_nid(virt_to_page(p4d)), PTCACHE_PT_P4D);
 	if (ptcache_return_table(ptdesc))
 		return;
 
