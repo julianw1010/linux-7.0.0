@@ -109,7 +109,8 @@ static void ptcache_pv_set_pud(pud_t *pudp, pud_t pudval)
 
 static void ptcache_pv_set_p4d(p4d_t *p4dp, p4d_t p4dval)
 {
-	ptcache_stats_pt_write(p4dp, PTCACHE_PT_P4D);
+	ptcache_stats_pt_write(p4dp, pgtable_l5_enabled() ?
+					PTCACHE_PT_P4D : PTCACHE_PT_PGD);
 	native_set_p4d(p4dp, p4dval);
 }
 
