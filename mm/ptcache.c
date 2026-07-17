@@ -34,8 +34,10 @@ struct ptcache_stats {
 	void *mm;
 	int ever_enabled;
 
-	atomic_long_t hits;
-	atomic_long_t misses;
+	atomic_long_t thp_split;
+	atomic_long_t thp_collapse;
+	atomic_long_t deposits;
+	atomic_long_t withdrawals;
 
 	atomic_long_t pt_cur[PTCACHE_NODE_COUNT][PTCACHE_PT_NR_LEVELS];
 	atomic_long_t pt_max[PTCACHE_NODE_COUNT][PTCACHE_PT_NR_LEVELS];
@@ -197,6 +199,30 @@ void ptcache_stats_numa(struct mm_struct *mm, bool huge, int from, int to)
 		atomic_long_inc(&s->numa_migrate_4k[from][to]);
 }
 
+void ptcache_stats_thp_split(struct mm_struct *mm)
+{
+	if (mm && mm->ptcache_stats)
+		atomic_long_inc(&mm->ptcache_stats->thp_split);
+}
+
+void ptcache_stats_thp_collapse(struct mm_struct *mm)
+{
+	if (mm && mm->ptcache_stats)
+		atomic_long_inc(&mm->ptcache_stats->thp_collapse);
+}
+
+void ptcache_stats_deposit(struct mm_struct *mm)
+{
+	if (mm && mm->ptcache_stats)
+		atomic_long_inc(&mm->ptcache_stats->deposits);
+}
+
+void ptcache_stats_withdraw(struct mm_struct *mm)
+{
+	if (mm && mm->ptcache_stats)
+		atomic_long_inc(&mm->ptcache_stats->withdrawals);
+}
+
 static int __init ptcache_init(void)
 {
 	int node;
@@ -268,16 +294,12 @@ struct page *ptcache_alloc(struct mm_struct *mm, gfp_t gfp)
 	page = ptcache_pop(node);
 	if (page) {
 		atomic64_inc(&ptcache[node].hits);
-		if (mm->ptcache_stats)
-			atomic_long_inc(&mm->ptcache_stats->hits);
 		SetPagePtCache(page);
 		clear_highpage(page);
 		return page;
 	}
 
 	atomic64_inc(&ptcache[node].misses);
-	if (mm->ptcache_stats)
-		atomic_long_inc(&mm->ptcache_stats->misses);
 
 	return alloc_pages_node(node, gfp | __GFP_COMP, 0);
 }
@@ -528,19 +550,6 @@ static void ptcache_print_kv(struct seq_file *m, const char *label, long val)
 	seq_printf(m, "    %-40s %12ld\n", label, val);
 }
 
-static void ptcache_print_ratio(struct seq_file *m, const char *label,
-				long num, long den)
-{
-	if (den > 0) {
-		long x10 = (num * 10 + den / 2) / den;
-
-		seq_printf(m, "    %-40s %10ld.%ld%%\n",
-			   label, x10 / 10, x10 % 10);
-	} else {
-		seq_printf(m, "    %-40s %12s\n", label, "n/a");
-	}
-}
-
 static void ptcache_print_section(struct seq_file *m, const char *name)
 {
 	seq_printf(m, "\n  %s\n", name);
@@ -580,9 +589,6 @@ static void ptcache_print_node_matrix(struct seq_file *m,
 static void ptcache_stats_print(struct seq_file *m, struct ptcache_stats *s,
 				bool history)
 {
-	long h = atomic_long_read(&s->hits);
-	long mi = atomic_long_read(&s->misses);
-	long total = h + mi;
 	long tlb_sent = atomic_long_read(&s->tlb_shootdowns);
 	long tlb_bcast = atomic_long_read(&s->tlb_broadcasts);
 	int node;
@@ -594,11 +600,13 @@ static void ptcache_stats_print(struct seq_file *m, struct ptcache_stats *s,
 	seq_printf(m, "    %-40s %s\n", "comm", s->comm);
 	seq_printf(m, "    %-40s %px\n", "mm", s->mm);
 
-	ptcache_print_section(m, "Cache interaction");
-	ptcache_print_kv(m, "Cache hits", h);
-	ptcache_print_kv(m, "Cache misses", mi);
-	ptcache_print_kv(m, "Cache allocs (hits + misses)", total);
-	ptcache_print_ratio(m, "Hit rate", h * 100, total);
+	ptcache_print_section(m, "THP / page-table events");
+	ptcache_print_kv(m, "THP splits", atomic_long_read(&s->thp_split));
+	ptcache_print_kv(m, "THP collapses", atomic_long_read(&s->thp_collapse));
+	ptcache_print_kv(m, "THP pgtable deposits",
+			 atomic_long_read(&s->deposits));
+	ptcache_print_kv(m, "THP pgtable withdrawals",
+			 atomic_long_read(&s->withdrawals));
 
 	ptcache_print_section(m, "TLB shootdowns (remote-CPU IPIs)");
 	ptcache_print_kv(m, "Total shootdowns", tlb_sent);

@@ -23,6 +23,7 @@
 #include <linux/ksm.h>
 #include <linux/pgalloc.h>
 #include <linux/backing-dev.h>
+#include <linux/ptcache.h>
 
 #include <asm/tlb.h>
 #include "internal.h"
@@ -1226,6 +1227,8 @@ out_up_write:
 out_nolock:
 	if (folio)
 		folio_put(folio);
+	if (result == SCAN_SUCCEED)
+		ptcache_stats_thp_collapse(mm);
 	trace_mm_collapse_huge_page(mm, result == SCAN_SUCCEED, result);
 	return result;
 }
@@ -2275,6 +2278,8 @@ rollback:
 	folio_put(new_folio);
 out:
 	VM_BUG_ON(!list_empty(&pagelist));
+	if (result == SCAN_SUCCEED)
+		ptcache_stats_thp_collapse(mm);
 	trace_mm_khugepaged_collapse_file(mm, new_folio, index, addr, is_shmem, file, HPAGE_PMD_NR, result);
 	return result;
 }
