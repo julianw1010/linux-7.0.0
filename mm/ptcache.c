@@ -163,12 +163,21 @@ void ptcache_stats_fault(struct mm_struct *mm, unsigned int flags)
 		atomic_long_inc(&s->faults_node[node]);
 }
 
-void ptcache_stats_pt_write(int level)
+static bool ptcache_stats_ready __read_mostly;
+
+void ptcache_stats_pt_write(void *tablep, int level)
 {
-	struct mm_struct *mm = current->mm;
+	struct mm_struct *mm;
 	struct ptcache_stats *s;
 
-	if (!mm || level < 0 || level >= PTCACHE_PT_NR_LEVELS)
+	if (!READ_ONCE(ptcache_stats_ready))
+		return;
+	if (level < 0 || level >= PTCACHE_PT_NR_LEVELS)
+		return;
+	if (!virt_addr_valid(tablep))
+		return;
+	mm = READ_ONCE(virt_to_page(tablep)->ptcache_mm);
+	if (!mm)
 		return;
 	s = mm->ptcache_stats;
 	if (s)
@@ -282,6 +291,8 @@ static int __init ptcache_init(void)
 		atomic64_set(&ptcache[node].returns, 0);
 	}
 
+	WRITE_ONCE(ptcache_stats_ready, true);
+
 	return 0;
 }
 early_initcall(ptcache_init);
@@ -354,6 +365,8 @@ bool ptcache_return_table(struct ptdesc *ptdesc)
 {
 	struct page *page = ptdesc_page(ptdesc);
 	int node;
+
+	WRITE_ONCE(page->ptcache_mm, NULL);
 
 	if (!PagePtCache(page))
 		return false;

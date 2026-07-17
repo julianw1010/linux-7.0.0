@@ -33,7 +33,7 @@ struct ptcache_stats *ptcache_stats_attach(struct mm_struct *mm);
 void ptcache_stats_detach(struct mm_struct *mm);
 void ptcache_stats_mark_enabled(struct mm_struct *mm);
 void ptcache_stats_fault(struct mm_struct *mm, unsigned int flags);
-void ptcache_stats_pt_write(int level);
+void ptcache_stats_pt_write(void *tablep, int level);
 void ptcache_stats_pt_inc(struct mm_struct *mm, int node, int level);
 void ptcache_stats_pt_dec(struct mm_struct *mm, int node, int level);
 void ptcache_stats_tlb_ipi(struct mm_struct *mm, long count);

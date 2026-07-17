@@ -315,16 +315,25 @@ static inline pgd_t *_pgd_alloc(struct mm_struct *mm)
 	 * For simplicity, allocate a page for all users.
 	 */
 	pgd = __pgd_alloc(mm, pgd_allocation_order());
-	if (pgd)
-		ptcache_stats_pt_inc(mm, page_to_nid(virt_to_page(pgd)),
-				     PTCACHE_PT_PGD);
+	if (pgd) {
+		struct page *page = virt_to_page(pgd);
+		unsigned int i;
+
+		for (i = 0; i < (1U << pgd_allocation_order()); i++)
+			page[i].ptcache_mm = mm;
+		ptcache_stats_pt_inc(mm, page_to_nid(page), PTCACHE_PT_PGD);
+	}
 	return pgd;
 }
 
 static inline void _pgd_free(struct mm_struct *mm, pgd_t *pgd)
 {
-	ptcache_stats_pt_dec(mm, page_to_nid(virt_to_page(pgd)),
-			     PTCACHE_PT_PGD);
+	struct page *page = virt_to_page(pgd);
+	unsigned int i;
+
+	for (i = 0; i < (1U << pgd_allocation_order()); i++)
+		WRITE_ONCE(page[i].ptcache_mm, NULL);
+	ptcache_stats_pt_dec(mm, page_to_nid(page), PTCACHE_PT_PGD);
 	__pgd_free(mm, pgd);
 }
 

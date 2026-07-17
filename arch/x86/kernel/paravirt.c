@@ -91,31 +91,31 @@ static noinstr void pv_native_set_debugreg(int regno, unsigned long val)
 
 static void ptcache_pv_set_pte(pte_t *ptep, pte_t pteval)
 {
-	ptcache_stats_pt_write(PTCACHE_PT_PTE);
+	ptcache_stats_pt_write(ptep, PTCACHE_PT_PTE);
 	native_set_pte(ptep, pteval);
 }
 
 static void ptcache_pv_set_pmd(pmd_t *pmdp, pmd_t pmdval)
 {
-	ptcache_stats_pt_write(PTCACHE_PT_PMD);
+	ptcache_stats_pt_write(pmdp, PTCACHE_PT_PMD);
 	native_set_pmd(pmdp, pmdval);
 }
 
 static void ptcache_pv_set_pud(pud_t *pudp, pud_t pudval)
 {
-	ptcache_stats_pt_write(PTCACHE_PT_PUD);
+	ptcache_stats_pt_write(pudp, PTCACHE_PT_PUD);
 	native_set_pud(pudp, pudval);
 }
 
 static void ptcache_pv_set_p4d(p4d_t *p4dp, p4d_t p4dval)
 {
-	ptcache_stats_pt_write(PTCACHE_PT_P4D);
+	ptcache_stats_pt_write(p4dp, PTCACHE_PT_P4D);
 	native_set_p4d(p4dp, p4dval);
 }
 
 static void ptcache_pv_set_pgd(pgd_t *pgdp, pgd_t pgdval)
 {
-	ptcache_stats_pt_write(PTCACHE_PT_PGD);
+	ptcache_stats_pt_write(pgdp, PTCACHE_PT_PGD);
 	native_set_pgd(pgdp, pgdval);
 }
 #endif

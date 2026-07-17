@@ -189,6 +189,8 @@ struct page {
 	unsigned long _unused_slab_obj_exts;
 #endif
 
+	struct mm_struct *ptcache_mm;
+
 	/*
 	 * On machines where all RAM is mapped into kernel address space,
 	 * we can simply calculate the virtual address. On machines with

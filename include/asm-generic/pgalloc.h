@@ -89,6 +89,7 @@ static inline pgtable_t __pte_alloc_one_noprof(struct mm_struct *mm, gfp_t gfp)
 		return NULL;
 	}
 
+	ptdesc_page(ptdesc)->ptcache_mm = mm;
 	ptcache_stats_pt_inc(mm, page_to_nid(ptdesc_page(ptdesc)), PTCACHE_PT_PTE);
 	return ptdesc_page(ptdesc);
 }
@@ -170,6 +171,7 @@ static inline pmd_t *pmd_alloc_one_noprof(struct mm_struct *mm, unsigned long ad
 	if (mm == &init_mm)
 		ptdesc_set_kernel(ptdesc);
 
+	ptdesc_page(ptdesc)->ptcache_mm = mm;
 	ptcache_stats_pt_inc(mm, page_to_nid(ptdesc_page(ptdesc)), PTCACHE_PT_PMD);
 	return ptdesc_address(ptdesc);
 }
@@ -217,6 +219,7 @@ static inline pud_t *__pud_alloc_one_noprof(struct mm_struct *mm, unsigned long 
 	if (mm == &init_mm)
 		ptdesc_set_kernel(ptdesc);
 
+	ptdesc_page(ptdesc)->ptcache_mm = mm;
 	ptcache_stats_pt_inc(mm, page_to_nid(ptdesc_page(ptdesc)), PTCACHE_PT_PUD);
 	return ptdesc_address(ptdesc);
 }
@@ -285,6 +288,7 @@ static inline p4d_t *__p4d_alloc_one_noprof(struct mm_struct *mm, unsigned long 
 	if (mm == &init_mm)
 		ptdesc_set_kernel(ptdesc);
 
+	ptdesc_page(ptdesc)->ptcache_mm = mm;
 	ptcache_stats_pt_inc(mm, page_to_nid(ptdesc_page(ptdesc)), PTCACHE_PT_P4D);
 	return ptdesc_address(ptdesc);
 }
