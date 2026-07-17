@@ -4,6 +4,12 @@
 #include <linux/types.h>
 #include <linux/gfp_types.h>
 
+#ifdef CONFIG_PTCACHE_NUMA_NODE_COUNT
+#define PTCACHE_NODE_COUNT CONFIG_PTCACHE_NUMA_NODE_COUNT
+#else
+#define PTCACHE_NODE_COUNT 8
+#endif
+
 struct mm_struct;
 struct page;
 struct ptdesc;

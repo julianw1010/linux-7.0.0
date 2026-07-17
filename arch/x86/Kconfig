@@ -1537,6 +1537,17 @@ config NUMA
 
 	  Otherwise, you should say N.
 
+config PTCACHE_NUMA_NODE_COUNT
+	int "Number of NUMA nodes for ptcache per-mm statistics"
+	default 8
+	depends on NUMA
+	help
+	  Sets the maximum number of NUMA nodes that the per-mm
+	  ptcache statistics will track (autoNUMA migration matrices,
+	  per-node page-table distribution). Must be >= the number
+	  of online NUMA nodes on the target system. Keeping this
+	  value tight avoids oversized per-mm stats allocations.
+
 config AMD_NUMA
 	def_bool y
 	prompt "Old style AMD Opteron NUMA detection"

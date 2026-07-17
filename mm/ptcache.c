@@ -24,7 +24,7 @@ struct ptcache_head {
 	atomic64_t returns;
 } ____cacheline_aligned_in_smp;
 
-static struct ptcache_head ptcache[MAX_NUMNODES];
+static struct ptcache_head ptcache[PTCACHE_NODE_COUNT];
 
 struct ptcache_stats {
 	struct list_head list;
@@ -37,14 +37,14 @@ struct ptcache_stats {
 	atomic_long_t hits;
 	atomic_long_t misses;
 
-	atomic_long_t pt_cur[MAX_NUMNODES][PTCACHE_PT_NR_LEVELS];
-	atomic_long_t pt_max[MAX_NUMNODES][PTCACHE_PT_NR_LEVELS];
+	atomic_long_t pt_cur[PTCACHE_NODE_COUNT][PTCACHE_PT_NR_LEVELS];
+	atomic_long_t pt_max[PTCACHE_NODE_COUNT][PTCACHE_PT_NR_LEVELS];
 
 	atomic_long_t tlb_shootdowns;
 	atomic_long_t tlb_broadcasts;
 
-	atomic_long_t numa_migrate_4k[MAX_NUMNODES][MAX_NUMNODES];
-	atomic_long_t numa_migrate_2m[MAX_NUMNODES][MAX_NUMNODES];
+	atomic_long_t numa_migrate_4k[PTCACHE_NODE_COUNT][PTCACHE_NODE_COUNT];
+	atomic_long_t numa_migrate_2m[PTCACHE_NODE_COUNT][PTCACHE_NODE_COUNT];
 };
 
 static LIST_HEAD(ptcache_live_list);
@@ -132,7 +132,7 @@ void ptcache_stats_pt_inc(struct mm_struct *mm, int node, int level)
 	struct ptcache_stats *s;
 	long cur;
 
-	if (!mm || node < 0 || node >= MAX_NUMNODES)
+	if (!mm || node < 0 || node >= PTCACHE_NODE_COUNT)
 		return;
 	if (level < 0 || level >= PTCACHE_PT_NR_LEVELS)
 		return;
@@ -147,7 +147,7 @@ void ptcache_stats_pt_dec(struct mm_struct *mm, int node, int level)
 {
 	struct ptcache_stats *s;
 
-	if (!mm || node < 0 || node >= MAX_NUMNODES)
+	if (!mm || node < 0 || node >= PTCACHE_NODE_COUNT)
 		return;
 	if (level < 0 || level >= PTCACHE_PT_NR_LEVELS)
 		return;
@@ -188,8 +188,8 @@ void ptcache_stats_numa(struct mm_struct *mm, bool huge, int from, int to)
 	s = mm->ptcache_stats;
 	if (!s)
 		return;
-	if (from < 0 || from >= MAX_NUMNODES ||
-	    to < 0 || to >= MAX_NUMNODES)
+	if (from < 0 || from >= PTCACHE_NODE_COUNT ||
+	    to < 0 || to >= PTCACHE_NODE_COUNT)
 		return;
 	if (huge)
 		atomic_long_inc(&s->numa_migrate_2m[from][to]);
@@ -201,7 +201,7 @@ static int __init ptcache_init(void)
 {
 	int node;
 
-	for (node = 0; node < MAX_NUMNODES; node++) {
+	for (node = 0; node < PTCACHE_NODE_COUNT; node++) {
 		spin_lock_init(&ptcache[node].lock);
 		INIT_LIST_HEAD(&ptcache[node].pages);
 		ptcache[node].count = 0;
@@ -219,7 +219,7 @@ static bool ptcache_push(struct page *page, int node)
 	struct ptcache_head *cache;
 	unsigned long flags;
 
-	if (node < 0 || node >= MAX_NUMNODES)
+	if (node < 0 || node >= PTCACHE_NODE_COUNT)
 		return false;
 
 	cache = &ptcache[node];
@@ -262,7 +262,7 @@ struct page *ptcache_alloc(struct mm_struct *mm, gfp_t gfp)
 		return NULL;
 
 	node = numa_node_id();
-	if (node < 0 || node >= MAX_NUMNODES)
+	if (node < 0 || node >= PTCACHE_NODE_COUNT)
 		return NULL;
 
 	page = ptcache_pop(node);
@@ -328,7 +328,7 @@ static int ptcache_drain_all(void)
 {
 	int node, total = 0;
 
-	for (node = 0; node < MAX_NUMNODES; node++)
+	for (node = 0; node < PTCACHE_NODE_COUNT; node++)
 		total += ptcache_drain_node(node);
 
 	return total;
@@ -561,7 +561,7 @@ static void ptcache_print_node_header(struct seq_file *m)
 }
 
 static void ptcache_print_node_matrix(struct seq_file *m,
-				      atomic_long_t mat[][MAX_NUMNODES])
+				      atomic_long_t mat[][PTCACHE_NODE_COUNT])
 {
 	char buf[12];
 	int from, to;
