@@ -820,9 +820,15 @@ config PARAVIRT
 	  the kernel is theoretically slower and slightly larger.
 
 config PARAVIRT_XXL
-	bool
+	bool "Full paravirtualization MMU interface"
 	depends on X86_64
+	depends on PARAVIRT
 	select ARCH_HAS_LAZY_MMU_MODE
+	help
+	  Route MMU operations (page-table entry writes, CR3 writes, TLB
+	  flushes) through the pv_ops indirection layer even when not
+	  running under a hypervisor, so kernel instrumentation can
+	  observe every page-table entry write centrally.
 
 config PARAVIRT_SPINLOCKS
 	bool "Paravirtualization layer for spinlocks"

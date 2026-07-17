@@ -14,6 +14,7 @@
 #include <linux/uaccess.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
+#include <linux/jiffies.h>
 
 struct ptcache_head {
 	spinlock_t lock;
@@ -42,6 +43,12 @@ struct ptcache_stats {
 	atomic_long_t faults;
 	atomic_long_t faults_write;
 	atomic_long_t faults_present;
+	atomic_long_t faults_node[PTCACHE_NODE_COUNT];
+
+	atomic_long_t pt_writes[PTCACHE_PT_NR_LEVELS];
+
+	unsigned long start_jiffies;
+	unsigned long end_jiffies;
 
 	atomic_long_t pt_cur[PTCACHE_NODE_COUNT][PTCACHE_PT_NR_LEVELS];
 	atomic_long_t pt_max[PTCACHE_NODE_COUNT][PTCACHE_PT_NR_LEVELS];
@@ -73,6 +80,7 @@ struct ptcache_stats *ptcache_stats_attach(struct mm_struct *mm)
 	s->pid = current->pid;
 	get_task_comm(s->comm, current);
 	s->mm = mm;
+	s->start_jiffies = jiffies;
 
 	spin_lock(&ptcache_stats_lock);
 	s->id = ++ptcache_stats_next_id;
@@ -115,6 +123,8 @@ void ptcache_stats_detach(struct mm_struct *mm)
 		return;
 	}
 
+	s->end_jiffies = jiffies;
+
 	spin_lock(&ptcache_stats_lock);
 	list_move_tail(&s->list, &ptcache_hist_list);
 	spin_unlock(&ptcache_stats_lock);
@@ -136,6 +146,7 @@ static void ptcache_bump_max(atomic_long_t *maxp, long cur)
 void ptcache_stats_fault(struct mm_struct *mm, unsigned int flags)
 {
 	struct ptcache_stats *s;
+	int node;
 
 	if (!mm)
 		return;
@@ -147,6 +158,21 @@ void ptcache_stats_fault(struct mm_struct *mm, unsigned int flags)
 		atomic_long_inc(&s->faults_write);
 	if (flags & FAULT_FLAG_PROT)
 		atomic_long_inc(&s->faults_present);
+	node = numa_node_id();
+	if (node >= 0 && node < PTCACHE_NODE_COUNT)
+		atomic_long_inc(&s->faults_node[node]);
+}
+
+void ptcache_stats_pt_write(int level)
+{
+	struct mm_struct *mm = current->mm;
+	struct ptcache_stats *s;
+
+	if (!mm || level < 0 || level >= PTCACHE_PT_NR_LEVELS)
+		return;
+	s = mm->ptcache_stats;
+	if (s)
+		atomic_long_inc(&s->pt_writes[level]);
 }
 
 void ptcache_stats_pt_inc(struct mm_struct *mm, int node, int level)
@@ -630,6 +656,14 @@ static void ptcache_stats_print(struct seq_file *m, struct ptcache_stats *s,
 	seq_printf(m, "    %-40s %s\n", "comm", s->comm);
 	seq_printf(m, "    %-40s %px\n", "mm", s->mm);
 
+	{
+		unsigned long endj = history ? s->end_jiffies : jiffies;
+		unsigned int ms = jiffies_to_msecs(endj - s->start_jiffies);
+
+		seq_printf(m, "    %-40s %u.%03u\n", "lifetime (s)",
+			   ms / 1000, ms % 1000);
+	}
+
 	ptcache_print_section(m, "THP / page-table events");
 	ptcache_print_kv(m, "THP splits", atomic_long_read(&s->thp_split));
 	ptcache_print_kv(m, "THP collapses", atomic_long_read(&s->thp_collapse));
@@ -653,7 +687,26 @@ static void ptcache_stats_print(struct seq_file *m, struct ptcache_stats *s,
 		ptcache_print_group(m, "by fault type");
 		ptcache_print_sub2(m, "not-present (major/fill)", f - fp);
 		ptcache_print_sub2(m, "present (permission/minor)", fp);
+		ptcache_print_group(m, "by handling node");
+		ptcache_print_node_header(m);
+		seq_printf(m, "    %-4s", "flts");
+		for_each_online_node(node)
+			seq_printf(m, " %7ld",
+				   atomic_long_read(&s->faults_node[node]));
+		seq_putc(m, '\n');
 	}
+
+	ptcache_print_section(m, "Page-table entry writes (pv_ops, all levels)");
+	ptcache_print_kv(m, "PGD entry writes",
+			 atomic_long_read(&s->pt_writes[PTCACHE_PT_PGD]));
+	ptcache_print_kv(m, "P4D entry writes",
+			 atomic_long_read(&s->pt_writes[PTCACHE_PT_P4D]));
+	ptcache_print_kv(m, "PUD entry writes",
+			 atomic_long_read(&s->pt_writes[PTCACHE_PT_PUD]));
+	ptcache_print_kv(m, "PMD entry writes",
+			 atomic_long_read(&s->pt_writes[PTCACHE_PT_PMD]));
+	ptcache_print_kv(m, "PTE entry writes",
+			 atomic_long_read(&s->pt_writes[PTCACHE_PT_PTE]));
 
 	ptcache_print_section(m, "TLB shootdowns (remote-CPU IPIs)");
 	ptcache_print_kv(m, "Total shootdowns", tlb_sent);
