@@ -42,6 +42,9 @@ struct ptcache_stats {
 
 	atomic_long_t tlb_shootdowns;
 	atomic_long_t tlb_broadcasts;
+
+	atomic_long_t numa_migrate_4k[MAX_NUMNODES][MAX_NUMNODES];
+	atomic_long_t numa_migrate_2m[MAX_NUMNODES][MAX_NUMNODES];
 };
 
 static LIST_HEAD(ptcache_live_list);
@@ -174,6 +177,24 @@ void ptcache_stats_tlb_broadcast(struct mm_struct *mm, long count)
 	s = mm->ptcache_stats;
 	if (s)
 		atomic_long_add(count, &s->tlb_broadcasts);
+}
+
+void ptcache_stats_numa(struct mm_struct *mm, bool huge, int from, int to)
+{
+	struct ptcache_stats *s;
+
+	if (!mm)
+		return;
+	s = mm->ptcache_stats;
+	if (!s)
+		return;
+	if (from < 0 || from >= MAX_NUMNODES ||
+	    to < 0 || to >= MAX_NUMNODES)
+		return;
+	if (huge)
+		atomic_long_inc(&s->numa_migrate_2m[from][to]);
+	else
+		atomic_long_inc(&s->numa_migrate_4k[from][to]);
 }
 
 static int __init ptcache_init(void)
@@ -539,6 +560,23 @@ static void ptcache_print_node_header(struct seq_file *m)
 	seq_putc(m, '\n');
 }
 
+static void ptcache_print_node_matrix(struct seq_file *m,
+				      atomic_long_t mat[][MAX_NUMNODES])
+{
+	char buf[12];
+	int from, to;
+
+	ptcache_print_node_header(m);
+	for_each_online_node(from) {
+		scnprintf(buf, sizeof(buf), "n%d", from);
+		seq_printf(m, "    %-4s", buf);
+		for_each_online_node(to)
+			seq_printf(m, " %7ld",
+				   atomic_long_read(&mat[from][to]));
+		seq_putc(m, '\n');
+	}
+}
+
 static void ptcache_stats_print(struct seq_file *m, struct ptcache_stats *s,
 				bool history)
 {
@@ -567,6 +605,14 @@ static void ptcache_stats_print(struct seq_file *m, struct ptcache_stats *s,
 
 	ptcache_print_section(m, "TLB broadcasts (INVLPGB)");
 	ptcache_print_kv(m, "Total INVLPGB instructions", tlb_bcast);
+
+	ptcache_print_section(m,
+		"autoNUMA migrations: 4KB base pages  [rows = source node, cols = dest node]");
+	ptcache_print_node_matrix(m, s->numa_migrate_4k);
+
+	ptcache_print_section(m,
+		"autoNUMA migrations: 2MB THP pages  [rows = source node, cols = dest node]");
+	ptcache_print_node_matrix(m, s->numa_migrate_2m);
 
 	{
 		static const char * const lvl_name[PTCACHE_PT_NR_LEVELS] = {

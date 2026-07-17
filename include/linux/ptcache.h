@@ -30,5 +30,6 @@ void ptcache_stats_pt_inc(struct mm_struct *mm, int node, int level);
 void ptcache_stats_pt_dec(struct mm_struct *mm, int node, int level);
 void ptcache_stats_tlb_ipi(struct mm_struct *mm, long count);
 void ptcache_stats_tlb_broadcast(struct mm_struct *mm, long count);
+void ptcache_stats_numa(struct mm_struct *mm, bool huge, int from, int to);
 
 #endif /* _LINUX_PTCACHE_H */
