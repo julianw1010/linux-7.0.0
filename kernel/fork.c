@@ -113,6 +113,7 @@
 #include <asm/mmu_context.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
+#include <linux/ptcache.h>
 
 /* For dup_mmap(). */
 #include "../mm/internal.h"
@@ -1114,6 +1115,9 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 		goto fail_mm_init;
 
 	mm->cache_only_mode = false;
+	mm->ptcache_stats = NULL;
+
+	ptcache_stats_attach(mm);
 
 	if (mm_alloc_pgd(mm))
 		goto fail_nopgd;
@@ -1144,6 +1148,7 @@ fail_nocontext:
 fail_noid:
 	mm_free_pgd(mm);
 fail_nopgd:
+	ptcache_stats_detach(mm);
 	futex_hash_free(mm);
 fail_mm_init:
 	free_mm(mm);
@@ -1175,6 +1180,7 @@ static inline void __mmput(struct mm_struct *mm)
 	ksm_exit(mm);
 	khugepaged_exit(mm); /* must run before exit_mmap */
 	exit_mmap(mm);
+	ptcache_stats_detach(mm);
 	mm_put_huge_zero_folio(mm);
 	set_mm_exe_file(mm, NULL);
 	if (!list_empty(&mm->mmlist)) {
@@ -1531,6 +1537,8 @@ static struct mm_struct *dup_mm(struct task_struct *tsk,
 		goto fail_nomem;
 
 	mm->cache_only_mode = saved_cache_only_mode;
+	if (saved_cache_only_mode)
+		ptcache_stats_mark_enabled(mm);
 
 	uprobe_start_dup_mmap();
 	err = dup_mmap(mm, oldmm);

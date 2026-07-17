@@ -1149,6 +1149,7 @@ struct mm_struct {
 		unsigned long task_size;	/* size of task vm space */
 
 		bool cache_only_mode;
+		struct ptcache_stats *ptcache_stats;
 
 		pgd_t * pgd;
 

@@ -72,6 +72,7 @@
 #include <linux/uaccess.h>
 #include <asm/mmu_context.h>
 #include <asm/tlb.h>
+#include <linux/ptcache.h>
 
 #include <trace/events/task.h>
 #include "internal.h"
@@ -1456,8 +1457,11 @@ static struct linux_binprm *alloc_bprm(int fd, struct filename *filename, int fl
 
 	retval = bprm_mm_init(bprm);
 	if (!retval) {
-		if (current->mm)
+		if (current->mm) {
 			bprm->mm->cache_only_mode = current->mm->cache_only_mode;
+			if (current->mm->cache_only_mode)
+				ptcache_stats_mark_enabled(bprm->mm);
+		}
 
 		return bprm;
 	}

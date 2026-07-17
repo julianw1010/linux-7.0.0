@@ -67,6 +67,7 @@
 #include <linux/cred.h>
 
 #include <linux/nospec.h>
+#include <linux/ptcache.h>
 
 #include <linux/kmsg_dump.h>
 /* Move somewhere else to avoid recompiling? */
@@ -2913,6 +2914,8 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		if (!me->mm)
 			return -EINVAL;
 		WRITE_ONCE(me->mm->cache_only_mode, arg2 != 0);
+		if (arg2 != 0)
+			ptcache_stats_mark_enabled(me->mm);
 		error = 0;
 		break;
 	case PR_GET_PGTABLE_CACHE_ONLY:
