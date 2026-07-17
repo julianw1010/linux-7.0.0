@@ -1457,11 +1457,8 @@ static struct linux_binprm *alloc_bprm(int fd, struct filename *filename, int fl
 
 	retval = bprm_mm_init(bprm);
 	if (!retval) {
-		if (current->mm) {
+		if (current->mm)
 			bprm->mm->cache_only_mode = current->mm->cache_only_mode;
-			if (current->mm->cache_only_mode)
-				ptcache_stats_mark_enabled(bprm->mm);
-		}
 
 		return bprm;
 	}
@@ -1764,6 +1761,8 @@ static int bprm_execve(struct linux_binprm *bprm)
 	user_events_execve(current);
 	acct_update_integrals(current);
 	task_numa_free(current, false);
+	if (current->mm->cache_only_mode)
+		ptcache_stats_mark_enabled(current->mm);
 	return retval;
 
 out:

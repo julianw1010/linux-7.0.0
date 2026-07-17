@@ -6,6 +6,7 @@
 #include <asm/tlb.h>
 #include <asm/fixmap.h>
 #include <asm/mtrr.h>
+#include <linux/ptcache.h>
 
 #ifdef CONFIG_DYNAMIC_PHYSICAL_MASK
 phys_addr_t physical_mask __ro_after_init = (1ULL << __PHYSICAL_MASK_SHIFT) - 1;
@@ -305,17 +306,25 @@ static void pgd_prepopulate_user_pmd(struct mm_struct *mm,
 
 static inline pgd_t *_pgd_alloc(struct mm_struct *mm)
 {
+	pgd_t *pgd;
+
 	/*
 	 * PTI and Xen need a whole page for the PAE PGD
 	 * even though the hardware only needs 32 bytes.
 	 *
 	 * For simplicity, allocate a page for all users.
 	 */
-	return __pgd_alloc(mm, pgd_allocation_order());
+	pgd = __pgd_alloc(mm, pgd_allocation_order());
+	if (pgd)
+		ptcache_stats_pt_inc(mm, page_to_nid(virt_to_page(pgd)),
+				     PTCACHE_PT_PGD);
+	return pgd;
 }
 
 static inline void _pgd_free(struct mm_struct *mm, pgd_t *pgd)
 {
+	ptcache_stats_pt_dec(mm, page_to_nid(virt_to_page(pgd)),
+			     PTCACHE_PT_PGD);
 	__pgd_free(mm, pgd);
 }
 
