@@ -39,6 +39,10 @@ struct ptcache_stats {
 	atomic_long_t deposits;
 	atomic_long_t withdrawals;
 
+	atomic_long_t faults;
+	atomic_long_t faults_write;
+	atomic_long_t faults_present;
+
 	atomic_long_t pt_cur[PTCACHE_NODE_COUNT][PTCACHE_PT_NR_LEVELS];
 	atomic_long_t pt_max[PTCACHE_NODE_COUNT][PTCACHE_PT_NR_LEVELS];
 
@@ -127,6 +131,22 @@ static void ptcache_bump_max(atomic_long_t *maxp, long cur)
 			break;
 		mx = prev;
 	}
+}
+
+void ptcache_stats_fault(struct mm_struct *mm, unsigned int flags)
+{
+	struct ptcache_stats *s;
+
+	if (!mm)
+		return;
+	s = mm->ptcache_stats;
+	if (!s)
+		return;
+	atomic_long_inc(&s->faults);
+	if (flags & FAULT_FLAG_WRITE)
+		atomic_long_inc(&s->faults_write);
+	if (flags & FAULT_FLAG_PROT)
+		atomic_long_inc(&s->faults_present);
 }
 
 void ptcache_stats_pt_inc(struct mm_struct *mm, int node, int level)
@@ -556,6 +576,16 @@ static void ptcache_print_section(struct seq_file *m, const char *name)
 	seq_puts(m, "  ------------------------------------------------------------------\n");
 }
 
+static void ptcache_print_group(struct seq_file *m, const char *name)
+{
+	seq_printf(m, "      %s:\n", name);
+}
+
+static void ptcache_print_sub2(struct seq_file *m, const char *label, long val)
+{
+	seq_printf(m, "        %-36s %12ld\n", label, val);
+}
+
 static void ptcache_print_node_header(struct seq_file *m)
 {
 	char buf[12];
@@ -607,6 +637,23 @@ static void ptcache_stats_print(struct seq_file *m, struct ptcache_stats *s,
 			 atomic_long_read(&s->deposits));
 	ptcache_print_kv(m, "THP pgtable withdrawals",
 			 atomic_long_read(&s->withdrawals));
+
+	{
+		long f = atomic_long_read(&s->faults);
+		long fw = atomic_long_read(&s->faults_write);
+		long fp = atomic_long_read(&s->faults_present);
+
+		ptcache_print_section(m, "Page faults");
+		seq_puts(m,
+			 "  (each of the two breakdowns below sums to the total independently)\n");
+		ptcache_print_kv(m, "Total faults", f);
+		ptcache_print_group(m, "by access");
+		ptcache_print_sub2(m, "read", f - fw);
+		ptcache_print_sub2(m, "write", fw);
+		ptcache_print_group(m, "by fault type");
+		ptcache_print_sub2(m, "not-present (major/fill)", f - fp);
+		ptcache_print_sub2(m, "present (permission/minor)", fp);
+	}
 
 	ptcache_print_section(m, "TLB shootdowns (remote-CPU IPIs)");
 	ptcache_print_kv(m, "Total shootdowns", tlb_sent);
