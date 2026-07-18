@@ -46,6 +46,7 @@ struct ptcache_stats {
 	atomic_long_t faults_node[PTCACHE_NODE_COUNT];
 
 	atomic_long_t pt_writes[PTCACHE_PT_NR_LEVELS];
+	atomic_long_t pt_write_pages[PTCACHE_PT_NR_LEVELS];
 
 	unsigned long start_jiffies;
 	unsigned long end_jiffies;
@@ -180,8 +181,10 @@ void ptcache_stats_pt_write(void *tablep, int level)
 	if (!mm)
 		return;
 	s = mm->ptcache_stats;
-	if (s)
+	if (s) {
 		atomic_long_inc(&s->pt_writes[level]);
+		atomic_long_inc(&s->pt_write_pages[level]);
+	}
 }
 
 void ptcache_stats_pt_inc(struct mm_struct *mm, int node, int level)
@@ -709,17 +712,27 @@ static void ptcache_stats_print(struct seq_file *m, struct ptcache_stats *s,
 		seq_putc(m, '\n');
 	}
 
-	ptcache_print_section(m, "Page-table entry writes (pv_ops, all levels)");
-	ptcache_print_kv(m, "PGD entry writes",
-			 atomic_long_read(&s->pt_writes[PTCACHE_PT_PGD]));
-	ptcache_print_kv(m, "P4D entry writes",
-			 atomic_long_read(&s->pt_writes[PTCACHE_PT_P4D]));
-	ptcache_print_kv(m, "PUD entry writes",
-			 atomic_long_read(&s->pt_writes[PTCACHE_PT_PUD]));
-	ptcache_print_kv(m, "PMD entry writes",
-			 atomic_long_read(&s->pt_writes[PTCACHE_PT_PMD]));
-	ptcache_print_kv(m, "PTE entry writes",
-			 atomic_long_read(&s->pt_writes[PTCACHE_PT_PTE]));
+	{
+		static const char * const lvl_name[PTCACHE_PT_NR_LEVELS] = {
+			"PGD", "P4D", "PUD", "PMD", "PTE",
+		};
+		int lvl;
+
+		ptcache_print_section(m,
+			"Page-table entry modifications + replica fan-out (all ops)  [rows = level]");
+		seq_puts(m,
+			 "  (writes = set/clear/wrprotect/young calls; pages = replica table pages touched)\n");
+		seq_printf(m, "      %-6s %12s %12s %16s\n",
+			   "level", "writes", "pages", "avg pages/write");
+		for (lvl = 0; lvl < PTCACHE_PT_NR_LEVELS; lvl++) {
+			long w = atomic_long_read(&s->pt_writes[lvl]);
+			long p = atomic_long_read(&s->pt_write_pages[lvl]);
+			long h = w ? p * 100 / w : 0;
+
+			seq_printf(m, "      %-6s %12ld %12ld %13ld.%02ld\n",
+				   lvl_name[lvl], w, p, h / 100, h % 100);
+		}
+	}
 
 	ptcache_print_section(m, "TLB shootdowns (remote-CPU IPIs)");
 	ptcache_print_kv(m, "Total shootdowns", tlb_sent);
